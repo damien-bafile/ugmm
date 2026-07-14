@@ -233,9 +233,13 @@ if (isset($_POST['delete_form']) && !$error) {
         $error[] = "You must enter the confirmation text exactly.";
     } else {
         $member = $OrgMembers->get_member_object($memberid);
-        $member->delete();
-        $success[] = "Member deleted.";
-        redirect_with_messages('ctte-members');
+        if (count($member->payments) > 0 && !isset($_POST['delete_confirm_payments'])) {
+            $error[] = "You must confirm deletion of a member with payment records.";
+        } else {
+            $member->delete();
+            $success[] = "Member deleted.";
+            redirect_with_messages('ctte-members');
+        }
     }
 }
 

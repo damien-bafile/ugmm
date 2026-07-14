@@ -3,7 +3,10 @@
 declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 
-require_once dirname(__FILE__).'/../vendor/autoload.php';
+require_once '/usr/share/php/Symfony/Component/CssSelector/autoload.php';
+require_once '/usr/share/php/Symfony/Component/Mime/autoload.php';
+require_once '/usr/share/php/Symfony/Component/HttpClient/autoload.php';
+require_once '/usr/share/php/Symfony/Component/BrowserKit/autoload.php';
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\BrowserKit\HttpBrowser;
 
@@ -569,6 +572,65 @@ final class UGMMTest extends TestCase
 
         $page = $client->submitForm('Delete Member', [
             'delete_verification' => 'Yes I am sure.',
+        ]);
+        $this->assertText($page, 'title', ' - Membership List');
+        $this->assertText($page, '#successmessages li', 'Member deleted.');
+    }
+
+    public function testCommitteeDeleteMemberWithPayments(): void
+    {
+        $client = new HttpBrowser();
+        $this->login($client, 'chair', 'chairpass');
+        $page = $client->clickLink('Committee');
+        $this->assertText($page, 'title', ' - Membership List');
+        $page = $client->clickLink('New Member');
+        $this->assertText($page, 'title', ' - Add Member');
+
+        $uid = sprintf('paydel%05d', rand(0, 99999));
+        $page = $client->submitForm('Add New Member', [
+            'displayName' => 'Pay Delete',
+            'mail' => $uid . '@example.com',
+            'street' => '123 Fake St',
+            'homePhone' => '08 5550 1111',
+            'pager' => '08 5550 2222',
+            'mobile' => '08 5550 3333',
+            'uid' => $uid,
+            'password' => 'pass1234',
+            'vpassword' => 'pass1234',
+            'notes' => 'Created for delete with payments test',
+        ]);
+        $this->assertText($page, 'title', ' - Add Member');
+        $this->assertText($page, '#successmessages li', 'New member created with id ');
+
+        $link = $page->filter('a')->reduce(
+            function (Crawler $node, $i): bool {
+                return str_contains($node->text(), ' to make payment');
+            }
+        )->link();
+        $page = $client->click($link);
+        $this->assertText($page, 'title', ' - Edit Member');
+
+        // Make a payment
+        $payment_date = new DateTimeImmutable()->format('Y-m-d');
+        $page = $client->submitForm('Make Payment', [
+            'payment_date' => $payment_date,
+            'receipt_number' => 'delete test payment',
+            'payment_ack' => '1',
+        ]);
+        $this->assertText($page, 'title', ' - Edit Member');
+        $this->assertText($page, '#successmessages li', 'Payment processed');
+
+        // Try to delete without confirming payment records
+        $page = $client->submitForm('Delete Member', [
+            'delete_verification' => 'Yes I am sure.',
+        ]);
+        $this->assertText($page, 'title', ' - Edit Member');
+        $this->assertText($page, '#errormessages strong', 'You must confirm deletion of a member with payment records.');
+
+        // Now delete with the payment confirmation checkbox
+        $page = $client->submitForm('Delete Member', [
+            'delete_verification' => 'Yes I am sure.',
+            'delete_confirm_payments' => '1',
         ]);
         $this->assertText($page, 'title', ' - Membership List');
         $this->assertText($page, '#successmessages li', 'Member deleted.');

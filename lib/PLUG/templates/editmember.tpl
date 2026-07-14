@@ -208,6 +208,12 @@
     Very rarely should actual members be deleted. Instead accounts
     should be locked, or accounts and memberships will lapse and do
     so automatically.<br>
+{if $member->payments|count > 0}
+    <label>
+      <input type="checkbox" name="delete_confirm_payments" value="1">
+      This member has payment records &mdash; check to confirm deletion
+    </label><br>
+{/if}
     <input type="text" name="delete_verification" size="30">
     <input type="submit" name="go_go_button" value="Delete Member"><br>
   </form>
